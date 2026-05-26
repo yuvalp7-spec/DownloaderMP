@@ -5,27 +5,42 @@ import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 2.0", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 2.5", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 2.0")
-st.write("הדבק קישור מיוטיוב, טיקטוק או אינסטגרם, חתוך את הזמן והורד ישירות למכשיר!")
+st.title("🎬 Advanced Downloader 2.5")
+st.write("הדבק קישור מיוטיוב, טיקטוק או אינסטגרם, בחר איכות, חתוך את הזמן והורד ישירות למכשיר!")
 
 # שדה קלט לקישור
 url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="https://...")
 
+# בחירת פורמט הורדה ראשי
+format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", "סאונד בלבד (MP3)"])
+
+# הרחבה לבחירת איכות הורדה (רלוונטי בעיקר לוידאו)
+if format_type == "וידאו (MP4)":
+    quality = st.selectbox("📺 בחר איכות וידאו:", [
+        "הכי גבוהה שיש (Best Quality)",
+        "1080p (Full HD - אם זמין)",
+        "720p (HD)",
+        "480p / 360p (חיסכון בנתונים)"
+    ])
+else:
+    quality = st.selectbox("🎧 בחר איכות סאונד:", [
+        "הכי גבוהה שיש (320kbps/Best)",
+        "סטנדרטית (192kbps)",
+        "נמוכה (128kbps - קובץ קטן)"
+    ])
+
 # שדות לבחירת זמן (חיתוך)
 col1, col2 = st.columns(2)
 with col1:
-    start_time = st.text_input("⏱️ זמן התחלה:", value="00:00:00")
+    start_time = st.text_input("⏱️ זמן התחלה (שעות:דקות:שניות):", value="00:00:00")
 with col2:
     end_time = st.text_input("⏱️ זמן סיום (אופציונלי):", placeholder="עד סוף הסרטון")
 
 # בחירת מהירות סרטון
 speed = st.selectbox("🚀 מהירות ניגון:", ["Normal (1.0x)", "Slow Motion (0.5x)", "Fast (1.25x)", "Faster (1.5x)", "Double Speed (2.0x)"])
 speed_val = float(speed.split("(")[1].replace("x)", ""))
-
-# בחירת פורמט הורדה
-format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", "סאונד בלבד (MP3)"])
 
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
@@ -35,14 +50,33 @@ if url:
                 os.makedirs(temp_dir, exist_ok=True)
                 temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
                 
-                # הגדרות הורדה
-                ydl_opts = {'outtmpl': temp_raw, 'overwrites': True}
+                # הגדרות הורדה בסיסיות
+                ydl_opts = {
+                    'outtmpl': temp_raw, 
+                    'overwrites': True,
+                    'quiet': True,
+                    'no_warnings': True
+                }
+                
+                # התאמת פורמט ואיכות לפי בחירת המשתמש
                 if format_type == "סאונד בלבד (MP3)":
-                    ydl_opts.update({'format': 'bestaudio'})
                     ext = "mp3"
+                    if "320kbps" in quality or "Best" in quality:
+                        ydl_opts.update({'format': 'bestaudio/best'})
+                    elif "192kbps" in quality:
+                        ydl_opts.update({'format': 'bestaudio[abr<=192]/best'})
+                    else:
+                        ydl_opts.update({'format': 'bestaudio[abr<=128]/best'})
                 else:
-                    ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'})
                     ext = "mp4"
+                    if "1080p" in quality:
+                        ydl_opts.update({'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best'})
+                    elif "720p" in quality:
+                        ydl_opts.update({'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best'})
+                    elif "480p" in quality:
+                        ydl_opts.update({'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best'})
+                    else:
+                        ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'})
                 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
@@ -54,10 +88,13 @@ if url:
                 
                 # פקודת FFmpeg לחיתוך ושינוי מהירות
                 ffmpeg_cmd = ['ffmpeg', '-y']
+                
+                # חיתוך זמן התחלה וסוף בצורה יעילה
                 if start_time and start_time != "00:00:00":
                     ffmpeg_cmd.extend(['-ss', start_time])
                 if end_time:
                     ffmpeg_cmd.extend(['-to', end_time])
+                    
                 ffmpeg_cmd.extend(['-i', downloaded_file])
                 
                 # שינוי מהירות אם נבחרה מהירות שונה מ-1
@@ -67,22 +104,34 @@ if url:
                     else:
                         ffmpeg_cmd.extend(['-filter:v', f"setpts={1.0/speed_val}*PTS", '-filter:a', f"atempo={speed_val}"])
                 
+                # קידוד מחדש בסיסי לפורמט תקני כדי שהורדה תרוץ חלק במובייל
+                if format_type == "וידאו (MP4)":
+                    ffmpeg_cmd.extend(['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac'])
+                
                 ffmpeg_cmd.append(final_output)
                 subprocess.run(ffmpeg_cmd, check=True)
                 
-                # הצגת כפתור הורדה ישיר למשתמש בטלפון!
+                # הצגת כפתור הורדה ישיר למשתמש בטופס
                 with open(final_output, "rb") as f:
-                    st.success("הסרטון מוכן לחילוץ!")
+                    st.success("✨ הסרטון עובד ועובד בהצלחה!")
+                    
+                    # ניקוי שם הקובץ מתווים בעייתים
+                    safe_title = "".join([c for c in info['title'] if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                    safe_title = safe_title[:20] if safe_title else "media"
+                    
                     st.download_button(
                         label="📥 לחץ כאן להורדת הקובץ למכשיר",
                         data=f,
-                        file_name=f"Advanced_Downloader_{info['title'][:15]}.{ext}",
+                        file_name=f"{safe_title}.{ext}",
                         mime=f"video/{ext}" if ext == "mp4" else "audio/mpeg"
                     )
                 
-                # ניקוי זמני
+                # ניקוי תיקיות זמניות
                 shutil.rmtree(temp_dir)
                 if os.path.exists(final_output): os.remove(final_output)
                 
             except Exception as e:
-                st.error(f"אירעה שגיאה בעיבוד: {str(e)[:50]}")
+                st.error(f"אירעה שגיאה בעיבוד: {str(e)}")
+                # ניקוי ליתר ביטחון גם בשגיאה
+                if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+                if os.path.exists(final_output): os.remove(final_output)

@@ -1,14 +1,14 @@
 import streamlit as st
-import yt_dlp
 import os
+import requests
 import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 6.0", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Universal Downloader 7.0", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 6.0")
-st.write("מנוע חתימה דיגיטלית הופעל (Bypass Engine). בחר איכות, חתוך והורד ישירות למכשיר!")
+st.title("🎬 Universal Downloader 7.0")
+st.write("מנוע עוקף חסימות גלובלי פעיל! בחר איכות, מהירות וחיתוך זמן.")
 
 # שדה קלט לקישור
 url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="https://...")
@@ -16,13 +16,9 @@ url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="ht
 # בחירת פורמט הורדה ראשי
 format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", "סאונד בלבד (MP3)"])
 
-# בחירת איכות הורדה
+# בחירת איכות
 if format_type == "וידאו (MP4)":
-    quality = st.selectbox("📺 בחר איכות וידאו:", [
-        "720p (HD - מומלץ ויציב)",
-        "1080p (Full HD)",
-        "480p / 360p"
-    ])
+    quality = st.selectbox("📺 בחר איכות וידאו:", ["720p (HD - מומלץ ויציב)", "1080p (Full HD)", "480p"])
 else:
     quality = st.selectbox("🎧 בחר איכות סאונד:", ["Best Audio (MP3)"])
 
@@ -39,57 +35,60 @@ speed_val = float(speed.split("(")[1].replace("x)", ""))
 
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
-        with st.spinner("מייצר חתימת אבטחה ומוריד בענן..."):
+        with st.spinner("מושך את המדיה בצינור המאובטח ומעבד בענן..."):
             temp_dir = "temp_process"
             final_output = None
             try:
                 os.makedirs(temp_dir, exist_ok=True)
-                temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
+                ext = "mp4" if format_type == "וידאו (MP4)" else "mp3"
+                downloaded_file = os.path.join(temp_dir, f"raw_input.{ext}")
                 
-                # הגדרות מתקדמות הכוללות פנייה לקליינטים מגוונים וחתימת לקוח גנרית מובנית
-                ydl_opts = {
-                    'outtmpl': temp_raw, 
-                    'overwrites': True,
-                    'quiet': True,
-                    'no_warnings': True,
-                    'nocheckcertificate': True,
-                    'extractor_args': {
-                        'youtube': {
-                            # שילוב קליינטים שמאלץ את יוטיוב להגיב בלי חסימת IP
-                            'player_client': ['tv', 'web', 'android'],
-                            # הזרקת נתוני מבקר פיקטיביים שעוקפים את מנגנון ה-403
-                            'visitor_data': 'aWdfX2d1ZXN0X19fXw==', 
-                        }
-                    },
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                    }
-                }
+                # פנייה ל-API המעודכן והחסין של Publer
+                api_url = "https://api.publer.io/v1/tools/media-downloader"
+                payload = {"url": url}
+                headers = {"Content-Type": "application/json"}
                 
-                # התאמת פורמט ואיכות
-                if format_type == "סאונד בלבד (MP3)":
-                    ext = "mp3"
-                    ydl_opts.update({'format': 'bestaudio/best'})
-                else:
-                    ext = "mp4"
-                    if "1080p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]'})
-                    elif "720p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]'})
-                    else:
-                        ydl_opts.update({'format': 'best[ext=mp4]/best'})
+                res = requests.post(api_url, json=payload, headers=headers, timeout=20)
+                res_data = res.json()
                 
-                # ביצוע ההורדה עם המעקף הדיגיטלי החדש
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    actual_ext = info.get('ext', ext)
-                    downloaded_file = os.path.join(temp_dir, f"raw.{actual_ext}")
+                # חילוץ הקישור הישיר לקובץ מתוך תגובת השרת
+                payload_data = res_data.get("payload", {})
+                job_url = None
+                
+                if ext == "mp3":
+                    # ניסיון למשוך אודיו בלבד
+                    audio_links = payload_data.get("audio", [])
+                    if audio_links:
+                        job_url = audio_links[0].get("url")
+                
+                # אם לא נמצא אודיו או שרצינו וידאו - ניקח מהווידאו
+                if not job_url:
+                    video_links = payload_data.get("video", [])
+                    if video_links:
+                        # מנסה למצוא את האיכות שנבחרה
+                        matched_video = [v for v in video_links if quality.split("p")[0] in v.get("quality", "")]
+                        if matched_video:
+                            job_url = matched_video[0].get("url")
+                        else:
+                            job_url = video_links[0].get("url")
+                            
+                if not job_url and payload_data.get("url"):
+                    job_url = payload_data.get("url")
+                    
+                if not job_url:
+                    raise Exception("השרת לא הצליח לחלץ קישור ישיר למדיה. ודא שהקישור תקין.")
+                
+                # הורדת הקובץ הפיזי אל שרת ה-Streamlit שלנו
+                file_res = requests.get(job_url, stream=True, timeout=30)
+                with open(downloaded_file, 'wb') as f:
+                    for chunk in file_res.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
                 
                 # נתיב לקובץ סופי
-                final_output = f"downloaded_media.{ext}"
+                final_output = f"final_media.{ext}"
                 
-                # פקודת FFmpeg לחיתוך ושינוי מהירות
+                # פקודת FFmpeg לחיתוך ושינוי מהירות (עובד פצצה בענן של Streamlit בזכות ה-packages.txt)
                 ffmpeg_cmd = ['ffmpeg', '-y']
                 
                 if start_time and start_time != "00:00:00":
@@ -115,15 +114,11 @@ if url:
                 
                 # הצגת כפתור הורדה למכשיר
                 with open(final_output, "rb") as f:
-                    st.success("✨ הסרטון עובד ועובד בהצלחה!")
-                    
-                    safe_title = "".join([c for c in info.get('title', 'media') if c.isalpha() or c.isdigit() or c==' ']).rstrip()
-                    safe_title = safe_title[:20] if safe_title else "media"
-                    
+                    st.success("✨ העיבוד הסתיים בהצלחה!")
                     st.download_button(
                         label="📥 לחץ כאן להורדת הקובץ למכשיר",
                         data=f,
-                        file_name=f"{safe_title}.{ext}",
+                        file_name=f"Media_{quality}_{speed}x.{ext}",
                         mime=f"video/mp4" if ext == "mp4" else "audio/mpeg"
                     )
                 
@@ -135,3 +130,4 @@ if url:
                     shutil.rmtree(temp_dir)
                 if final_output and os.path.exists(final_output):
                     os.remove(final_output)
+                    

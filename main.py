@@ -1,9 +1,9 @@
 import streamlit as st
 import urllib.parse
 
-st.set_page_config(page_title="Hybrid Downloader 8.0", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Hybrid Downloader 8.1", page_icon="🎬", layout="centered")
 
-st.title("🎬 Hybrid Downloader 8.0")
+st.title("🎬 Hybrid Downloader 8.1")
 st.write("מנוע היברידי: הממשק בענן, הביצוע החסין ישירות מהנייד שלך!")
 
 # שדה קלט לקישור
@@ -33,8 +33,8 @@ if url:
     st.markdown("---")
     st.subheader("🚀 שלבי הפעלה מהירים לנייד (חסין חסימות):")
     
-    # בניית פקודת הטרמינל עבור Pydroid 3
-    ext = "mp4" if format_choice = "וידאו (MP4)" else "mp3"
+    # תיקון תנאי ההשוואה ושם המשתנה
+    ext = "mp4" if format_type == "וידאו (MP4)" else "mp3"
     
     # הגדרת פילטר מהירות לטרמינל
     filter_cmd = ""

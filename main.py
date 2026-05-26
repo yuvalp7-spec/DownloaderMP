@@ -1,9 +1,9 @@
 import streamlit as st
 import urllib.parse
 
-st.set_page_config(page_title="Hybrid Downloader 8.1", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Hybrid Downloader 8.2", page_icon="🎬", layout="centered")
 
-st.title("🎬 Hybrid Downloader 8.1")
+st.title("🎬 Hybrid Downloader 8.2")
 st.write("מנוע היברידי: הממשק בענן, הביצוע החסין ישירות מהנייד שלך!")
 
 # שדה קלט לקישור
@@ -33,7 +33,6 @@ if url:
     st.markdown("---")
     st.subheader("🚀 שלבי הפעלה מהירים לנייד (חסין חסימות):")
     
-    # תיקון תנאי ההשוואה ושם המשתנה
     ext = "mp4" if format_type == "וידאו (MP4)" else "mp3"
     
     # הגדרת פילטר מהירות לטרמינל
@@ -47,15 +46,17 @@ if url:
     to_cmd = f"-to {end_time}" if end_time else ""
     quality_num = quality.replace("p", "")
     
-    # פקודת הדגל של yt-dlp שמבצעת את כל העבודה מקומית
     format_opt = f"best[height<={quality_num}][ext=mp4]/best" if ext == "mp4" else "bestaudio/best"
     
-    # פקודה אחת שמורידה, חותכת, משנה מהירות ושומרת בתיקיית ההורדות של הטלפון
-    pydroid_command = f'yt-dlp -f "{format_opt}" "{url}" -o "raw_tmp.%(ext)s" && ffmpeg -y -ss {start_time} {to_cmd} -i raw_tmp.* {filter_cmd} /storage/emulated/0/Download/Output_{speed_val}x.{ext} && rm raw_tmp.*'
+    # שימוש בנתיב המלא והמאולץ של ה-FFmpeg הפנימי של Pydroid 3 במובייל
+    pydroid_ffmpeg = "/data/data/ru.iiec.pydroid3/files/aarch64-linux-android/bin/ffmpeg"
+    
+    # בניית הפקודה המשולבת המושלמת
+    pydroid_command = f'yt-dlp -f "{format_opt}" "{url}" -o "raw_tmp.%(ext)s" && {pydroid_ffmpeg} -y -ss {start_time} {to_cmd} -i raw_tmp.* {filter_cmd} /storage/emulated/0/Download/Output_{speed_val}x.{ext} && rm raw_tmp.*'
     
     st.write("1. **העתק את פקודת ההרצה המוכנה עבור הטרמינל בטלפון:**")
     st.code(pydroid_command, language="bash")
     
-    st.write("2. פתח את אפליקציית **Pydroid 3**, כנס ל-**Terminal**, הדבק את השורה הזו ולחץ אנטר.")
+    st.write("2. פתח את אפליקציית **Pydroid 3**, ככנס ל-**Terminal**, הדבק את השורה הזו ולחץ אנטר.")
     st.success("✨ הקובץ החתוך והמואץ יישמר אוטומטית ישירות בתיקיית ה-Download הרגילה של הטלפון שלך!")
     

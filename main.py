@@ -5,9 +5,9 @@ import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 2.6", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 2.7", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 2.6")
+st.title("🎬 Advanced Downloader 2.7")
 st.write("הדבק קישור מיוטיוב, טיקטוק או אינסטגרם, בחר איכות, חתוך את הזמן והורד ישירות למכשיר!")
 
 # שדה קלט לקישור
@@ -51,18 +51,22 @@ if url:
                 os.makedirs(temp_dir, exist_ok=True)
                 temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
                 
-                # הגדרות הורדה קשוחות כדי לעקוף חסימות 403 של יוטיוב
+                # הגדרות עקיפת חסימות מתקדמות + שימוש בקליינטים חלופיים של יוטיוב
                 ydl_opts = {
                     'outtmpl': temp_raw, 
                     'overwrites': True,
                     'quiet': True,
                     'no_warnings': True,
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
+                    'nocheckcertificate': True,
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android', 'web'],
+                            'skip': ['dash', 'hls']
+                        }
                     },
-                    'nocheckcertificate': True
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    }
                 }
                 
                 # התאמת פורמט ואיכות לפי בחירת המשתמש
@@ -134,7 +138,7 @@ if url:
                     )
                 
             except Exception as e:
-                st.error(f"❌ אירעה שגיאה בעיבוד: {str(e)[:100]}")
+                st.error(f"❌ אירעה שגיאה בעיבוד: {str(e)[:150]}")
             
             finally:
                 # ניקוי בטוח של קבצים שלא ישאירו עקבות בשרת

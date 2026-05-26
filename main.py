@@ -5,10 +5,10 @@ import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 4.0", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 4.5", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 4.0")
-st.write("גרסה עצמאית חסינת חסימות (iOS Engine). הדבק קישור, חתוך והורד ישירות למכשיר!")
+st.title("🎬 Advanced Downloader 4.5")
+st.write("הדבק קישור מיוטיוב, טיקטוק או אינסטגרם, בחר איכות, חתוך והורד ישירות למכשיר!")
 
 # שדה קלט לקישור
 url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="https://...")
@@ -20,16 +20,11 @@ format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", 
 if format_type == "וידאו (MP4)":
     quality = st.selectbox("📺 בחר איכות וידאו:", [
         "הכי גבוהה שיש (Best Quality)",
-        "1080p (Full HD)",
         "720p (HD)",
         "480p / 360p"
     ])
 else:
-    quality = st.selectbox("🎧 בחר איכות סאונד:", [
-        "הכי גבוהה שיש (320kbps)",
-        "סטנדרטית (192kbps)",
-        "נמוכה (128kbps)"
-    ])
+    quality = st.selectbox("🎧 בחר איכות סאונד:", ["Best Audio (MP3)"])
 
 # שדות לבחירת זמן (חיתוך)
 col1, col2 = st.columns(2)
@@ -44,44 +39,41 @@ speed_val = float(speed.split("(")[1].replace("x)", ""))
 
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
-        with st.spinner("מוריד ומעבד את הסרטון בצינור המאובטח..."):
+        with st.spinner("מוריד ומעבד את הסרטון בצינור יציב..."):
             temp_dir = "temp_process"
             final_output = None
             try:
                 os.makedirs(temp_dir, exist_ok=True)
                 temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
                 
-                # הגדרות התחזות מושלמות לאייפון/ספארי - עוקף את חסימות ה-403 לחלוטין
+                # הגדרות נקיות לחלוטין בלי התחזויות בעייתיות, אילוץ קליינט אנדרואיד בסיסי
                 ydl_opts = {
                     'outtmpl': temp_raw, 
                     'overwrites': True,
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
-                    'impersonate': 'chrome', # התחזות ישירה לדפדפן אפל רשמי
                     'extractor_args': {
                         'youtube': {
-                            'player_client': ['ios'], # אילוץ שימוש בפרוטוקול iOS המאובטח
+                            'player_client': ['android'],
                         }
                     }
                 }
                 
-                # התאמת פורמט ואיכות לפי בחירת המשתמש
+                # הגדרת פורמטים בסיסיים שלא דורשים אימותים מורכבים
                 if format_type == "סאונד בלבד (MP3)":
                     ext = "mp3"
                     ydl_opts.update({'format': 'bestaudio/best'})
                 else:
                     ext = "mp4"
-                    if "1080p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]'})
-                    elif "720p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]'})
+                    if "720p" in quality:
+                        ydl_opts.update({'format': 'best[height<=720][ext=mp4]/best'})
                     elif "480p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]'})
+                        ydl_opts.update({'format': 'best[height<=480][ext=mp4]/best'})
                     else:
-                        ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best'})
+                        ydl_opts.update({'format': 'best[ext=mp4]/best'})
                 
-                # ביצוע ההורדה הישירה מהאייפון הווירטואלי לשרת שלנו
+                # ביצוע ההורדה המאובטחת
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     actual_ext = info.get('ext', ext)
@@ -114,9 +106,9 @@ if url:
                 ffmpeg_cmd.append(final_output)
                 subprocess.run(ffmpeg_cmd, check=True)
                 
-                # הצגת כפתור הורדה
+                # הצגת כפתור הורדה למשתמש
                 with open(final_output, "rb") as f:
-                    st.success("✨ הסרטון עובד ועובד בהצלחה!")
+                    st.success("✨ העיבוד הסתיים בהצלחה!")
                     
                     safe_title = "".join([c for c in info.get('title', 'media') if c.isalpha() or c.isdigit() or c==' ']).rstrip()
                     safe_title = safe_title[:20] if safe_title else "media"

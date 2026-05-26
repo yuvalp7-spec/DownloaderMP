@@ -5,9 +5,9 @@ import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 2.5", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 2.6", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 2.5")
+st.title("🎬 Advanced Downloader 2.6")
 st.write("הדבק קישור מיוטיוב, טיקטוק או אינסטגרם, בחר איכות, חתוך את הזמן והורד ישירות למכשיר!")
 
 # שדה קלט לקישור
@@ -16,7 +16,7 @@ url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="ht
 # בחירת פורמט הורדה ראשי
 format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", "סאונד בלבד (MP3)"])
 
-# הרחבה לבחירת איכות הורדה (רלוונטי בעיקר לוידאו)
+# הרחבה לבחירת איכות הורדה
 if format_type == "וידאו (MP4)":
     quality = st.selectbox("📺 בחר איכות וידאו:", [
         "הכי גבוהה שיש (Best Quality)",
@@ -45,17 +45,24 @@ speed_val = float(speed.split("(")[1].replace("x)", ""))
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
         with st.spinner("מוריד ומעבד את הסרטון בענן..."):
+            temp_dir = "temp_process"
+            final_output = None
             try:
-                temp_dir = "temp_process"
                 os.makedirs(temp_dir, exist_ok=True)
                 temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
                 
-                # הגדרות הורדה בסיסיות
+                # הגדרות הורדה קשוחות כדי לעקוף חסימות 403 של יוטיוב
                 ydl_opts = {
                     'outtmpl': temp_raw, 
                     'overwrites': True,
                     'quiet': True,
-                    'no_warnings': True
+                    'no_warnings': True,
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                    },
+                    'nocheckcertificate': True
                 }
                 
                 # התאמת פורמט ואיכות לפי בחירת המשתמש
@@ -78,6 +85,7 @@ if url:
                     else:
                         ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'})
                 
+                # ביצוע ההורדה
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
                     actual_ext = info.get('ext', ext)
@@ -89,7 +97,6 @@ if url:
                 # פקודת FFmpeg לחיתוך ושינוי מהירות
                 ffmpeg_cmd = ['ffmpeg', '-y']
                 
-                # חיתוך זמן התחלה וסוף בצורה יעילה
                 if start_time and start_time != "00:00:00":
                     ffmpeg_cmd.extend(['-ss', start_time])
                 if end_time:
@@ -97,26 +104,26 @@ if url:
                     
                 ffmpeg_cmd.extend(['-i', downloaded_file])
                 
-                # שינוי מהירות אם נבחרה מהירות שונה מ-1
+                # שינוי מהירות
                 if speed_val != 1.0:
                     if format_type == "סאונד בלבד (MP3)":
                         ffmpeg_cmd.extend(['-filter:a', f"atempo={speed_val}"])
                     else:
                         ffmpeg_cmd.extend(['-filter:v', f"setpts={1.0/speed_val}*PTS", '-filter:a', f"atempo={speed_val}"])
                 
-                # קידוד מחדש בסיסי לפורמט תקני כדי שהורדה תרוץ חלק במובייל
+                # קידוד וידאו תקני למובייל
                 if format_type == "וידאו (MP4)":
                     ffmpeg_cmd.extend(['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac'])
                 
                 ffmpeg_cmd.append(final_output)
                 subprocess.run(ffmpeg_cmd, check=True)
                 
-                # הצגת כפתור הורדה ישיר למשתמש בטופס
+                # הצגת כפתור הורדה
                 with open(final_output, "rb") as f:
-                    st.success("✨ הסרטון עובד ועובד בהצלחה!")
+                    st.success("✨ הסרטון עובד בהצלחה!")
                     
-                    # ניקוי שם הקובץ מתווים בעייתים
-                    safe_title = "".join([c for c in info['title'] if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                    # ניקוי שם הקובץ
+                    safe_title = "".join([c for c in info.get('title', 'media') if c.isalpha() or c.isdigit() or c==' ']).rstrip()
                     safe_title = safe_title[:20] if safe_title else "media"
                     
                     st.download_button(
@@ -126,12 +133,12 @@ if url:
                         mime=f"video/{ext}" if ext == "mp4" else "audio/mpeg"
                     )
                 
-                # ניקוי תיקיות זמניות
-                shutil.rmtree(temp_dir)
-                if os.path.exists(final_output): os.remove(final_output)
-                
             except Exception as e:
-                st.error(f"אירעה שגיאה בעיבוד: {str(e)}")
-                # ניקוי ליתר ביטחון גם בשגיאה
-                if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-                if os.path.exists(final_output): os.remove(final_output)
+                st.error(f"❌ אירעה שגיאה בעיבוד: {str(e)[:100]}")
+            
+            finally:
+                # ניקוי בטוח של קבצים שלא ישאירו עקבות בשרת
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+                if final_output and os.path.exists(final_output):
+                    os.remove(final_output)

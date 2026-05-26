@@ -5,10 +5,10 @@ import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 3.0", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 3.1", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 3.0")
-st.write("מנגנון עוקף חסימות קשוחות הופעל! הדבק קישור, חתוך והורד בבטחה.")
+st.title("🎬 Advanced Downloader 3.1")
+st.write("מנגנון עוקף חסימות מעודכן (v10 API). הדבק קישור, חתוך והורד בבטחה.")
 
 # שדה קלט לקישור
 url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="https://...")
@@ -18,7 +18,7 @@ format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", 
 
 # בחירת איכות
 if format_type == "וידאו (MP4)":
-    quality = st.selectbox("📺 בחר איכות וידאו:", ["High Quality", "Medium Quality"])
+    quality = st.selectbox("📺 בחר איכות וידאו:", ["1080p", "720p", "480p"])
 else:
     quality = st.selectbox("🎧 בחר איכות סאונד:", ["Best Audio (MP3)"])
 
@@ -35,7 +35,7 @@ speed_val = float(speed.split("(")[1].replace("x)", ""))
 
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
-        with st.spinner("מושך את הסרטון דרך צינור עוקף חסימות ומעבד..."):
+        with st.spinner("מושך את הסרטון דרך הצינור החדש ומעבד..."):
             temp_dir = "temp_process"
             final_output = None
             try:
@@ -43,33 +43,33 @@ if url:
                 ext = "mp4" if format_type == "וידאו (MP4)" else "mp3"
                 downloaded_file = os.path.join(temp_dir, f"raw_input.{ext}")
                 
-                # שימוש ב-API ציבורי מהיר ועוקף חסימות רשת של יוטיוב
-                api_url = f"https://api.cobalt.tools/api/json"
+                # הכתובת הרשמית והמעודכנת של ה-API החדש שלהם
+                api_url = "https://api.cobalt.tools/"
                 headers = {
                     "Accept": "application/json",
                     "Content-Type": "application/json"
                 }
+                
+                # הפורמט החדש של הגדרות ה-Payload
                 payload = {
                     "url": url,
-                    "filenamePattern": "basic",
-                    "downloadMode": "audio" if ext == "mp3" else "regular",
-                    "videoQuality": "1080" if "High" in quality else "720"
+                    "videoQuality": quality.replace("p", "") if ext == "mp4" else "720",
+                    "downloadMode": "audio" if ext == "mp3" else "auto"
                 }
                 
                 response = requests.post(api_url, json=payload, headers=headers)
                 res_data = response.json()
                 
-                if res_data.get("status") == "stream" or res_data.get("status") == "picker":
-                    file_download_url = res_data.get("url")
-                elif res_data.get("status") == "error":
-                    raise Exception(res_data.get("text", "שגיאת שרת חיצוני"))
-                else:
-                    file_download_url = res_data.get("url")
+                # חילוץ הקישור לפי הפורמט החדש
+                if res_data.get("status") == "error":
+                    raise Exception(res_data.get("error", {}).get("text", "שגיאת שרת חיצוני"))
+                
+                file_download_url = res_data.get("url")
                 
                 if not file_download_url:
-                    raise Exception("לא ניתן היה לחלץ קישור הורדה תקין")
+                    raise Exception("השרת לא החזיר קישור הורדה תקין. נסה שוב או בדוק את הקישור.")
                 
-                # הורדת הקובץ הזמני מה-API אל שרת ה-Streamlit שלנו
+                # הורדת הקובץ הזמני אל שרת ה-Streamlit שלנו
                 file_res = requests.get(file_download_url, stream=True)
                 with open(downloaded_file, 'wb') as f:
                     for chunk in file_res.iter_content(chunk_size=8192):
@@ -109,7 +109,7 @@ if url:
                     st.download_button(
                         label="📥 לחץ כאן להורדת הקובץ למכשיר",
                         data=f,
-                        file_name=f"Downloader_{final_output}",
+                        file_name=f"Downloader_File.{ext}",
                         mime=f"video/mp4" if ext == "mp4" else "audio/mpeg"
                     )
                 

@@ -1,14 +1,14 @@
 import streamlit as st
+import yt_dlp
 import os
-import requests
 import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 3.1", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 4.0", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 3.1")
-st.write("מנגנון עוקף חסימות מעודכן (v10 API). הדבק קישור, חתוך והורד בבטחה.")
+st.title("🎬 Advanced Downloader 4.0")
+st.write("גרסה עצמאית חסינת חסימות (iOS Engine). הדבק קישור, חתוך והורד ישירות למכשיר!")
 
 # שדה קלט לקישור
 url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="https://...")
@@ -16,11 +16,20 @@ url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="ht
 # בחירת פורמט הורדה ראשי
 format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", "סאונד בלבד (MP3)"])
 
-# בחירת איכות
+# בחירת איכות הורדה
 if format_type == "וידאו (MP4)":
-    quality = st.selectbox("📺 בחר איכות וידאו:", ["1080p", "720p", "480p"])
+    quality = st.selectbox("📺 בחר איכות וידאו:", [
+        "הכי גבוהה שיש (Best Quality)",
+        "1080p (Full HD)",
+        "720p (HD)",
+        "480p / 360p"
+    ])
 else:
-    quality = st.selectbox("🎧 בחר איכות סאונד:", ["Best Audio (MP3)"])
+    quality = st.selectbox("🎧 בחר איכות סאונד:", [
+        "הכי גבוהה שיש (320kbps)",
+        "סטנדרטית (192kbps)",
+        "נמוכה (128kbps)"
+    ])
 
 # שדות לבחירת זמן (חיתוך)
 col1, col2 = st.columns(2)
@@ -35,49 +44,51 @@ speed_val = float(speed.split("(")[1].replace("x)", ""))
 
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
-        with st.spinner("מושך את הסרטון דרך הצינור החדש ומעבד..."):
+        with st.spinner("מוריד ומעבד את הסרטון בצינור המאובטח..."):
             temp_dir = "temp_process"
             final_output = None
             try:
                 os.makedirs(temp_dir, exist_ok=True)
-                ext = "mp4" if format_type == "וידאו (MP4)" else "mp3"
-                downloaded_file = os.path.join(temp_dir, f"raw_input.{ext}")
+                temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
                 
-                # הכתובת הרשמית והמעודכנת של ה-API החדש שלהם
-                api_url = "https://api.cobalt.tools/"
-                headers = {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
+                # הגדרות התחזות מושלמות לאייפון/ספארי - עוקף את חסימות ה-403 לחלוטין
+                ydl_opts = {
+                    'outtmpl': temp_raw, 
+                    'overwrites': True,
+                    'quiet': True,
+                    'no_warnings': True,
+                    'nocheckcertificate': True,
+                    'impersonate': 'safari-15.5', # התחזות ישירה לדפדפן אפל רשמי
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['ios'], # אילוץ שימוש בפרוטוקול iOS המאובטח
+                        }
+                    }
                 }
                 
-                # הפורמט החדש של הגדרות ה-Payload
-                payload = {
-                    "url": url,
-                    "videoQuality": quality.replace("p", "") if ext == "mp4" else "720",
-                    "downloadMode": "audio" if ext == "mp3" else "auto"
-                }
+                # התאמת פורמט ואיכות לפי בחירת המשתמש
+                if format_type == "סאונד בלבד (MP3)":
+                    ext = "mp3"
+                    ydl_opts.update({'format': 'bestaudio/best'})
+                else:
+                    ext = "mp4"
+                    if "1080p" in quality:
+                        ydl_opts.update({'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]'})
+                    elif "720p" in quality:
+                        ydl_opts.update({'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]'})
+                    elif "480p" in quality:
+                        ydl_opts.update({'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]'})
+                    else:
+                        ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best'})
                 
-                response = requests.post(api_url, json=payload, headers=headers)
-                res_data = response.json()
-                
-                # חילוץ הקישור לפי הפורמט החדש
-                if res_data.get("status") == "error":
-                    raise Exception(res_data.get("error", {}).get("text", "שגיאת שרת חיצוני"))
-                
-                file_download_url = res_data.get("url")
-                
-                if not file_download_url:
-                    raise Exception("השרת לא החזיר קישור הורדה תקין. נסה שוב או בדוק את הקישור.")
-                
-                # הורדת הקובץ הזמני אל שרת ה-Streamlit שלנו
-                file_res = requests.get(file_download_url, stream=True)
-                with open(downloaded_file, 'wb') as f:
-                    for chunk in file_res.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
+                # ביצוע ההורדה הישירה מהאייפון הווירטואלי לשרת שלנו
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    actual_ext = info.get('ext', ext)
+                    downloaded_file = os.path.join(temp_dir, f"raw.{actual_ext}")
                 
                 # נתיב לקובץ סופי
-                final_output = f"final_media.{ext}"
+                final_output = f"downloaded_media.{ext}"
                 
                 # פקודת FFmpeg לחיתוך ושינוי מהירות
                 ffmpeg_cmd = ['ffmpeg', '-y']
@@ -103,13 +114,17 @@ if url:
                 ffmpeg_cmd.append(final_output)
                 subprocess.run(ffmpeg_cmd, check=True)
                 
-                # הצגת כפתור הורדה למכשיר
+                # הצגת כפתור הורדה
                 with open(final_output, "rb") as f:
-                    st.success("✨ העיבוד הסתיים בהצלחה!")
+                    st.success("✨ הסרטון עובד ועובד בהצלחה!")
+                    
+                    safe_title = "".join([c for c in info.get('title', 'media') if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                    safe_title = safe_title[:20] if safe_title else "media"
+                    
                     st.download_button(
                         label="📥 לחץ כאן להורדת הקובץ למכשיר",
                         data=f,
-                        file_name=f"Downloader_File.{ext}",
+                        file_name=f"{safe_title}.{ext}",
                         mime=f"video/mp4" if ext == "mp4" else "audio/mpeg"
                     )
                 

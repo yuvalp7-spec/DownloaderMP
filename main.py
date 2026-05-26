@@ -1,14 +1,14 @@
 import streamlit as st
-import yt_dlp
 import os
+import requests
 import subprocess
 import shutil
 
 # הגדרות עיצוב דף
-st.set_page_config(page_title="Advanced Downloader 2.7", page_icon="🎬", layout="centered")
+st.set_page_config(page_title="Advanced Downloader 3.0", page_icon="🎬", layout="centered")
 
-st.title("🎬 Advanced Downloader 2.7")
-st.write("הדבק קישור מיוטיוב, טיקטוק או אינסטגרם, בחר איכות, חתוך את הזמן והורד ישירות למכשיר!")
+st.title("🎬 Advanced Downloader 3.0")
+st.write("מנגנון עוקף חסימות קשוחות הופעל! הדבק קישור, חתוך והורד בבטחה.")
 
 # שדה קלט לקישור
 url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="https://...")
@@ -16,20 +16,11 @@ url = st.text_input("הדבק את הקישור שלך כאן:", placeholder="ht
 # בחירת פורמט הורדה ראשי
 format_type = st.radio("🎵 בחר פורמט קובץ:", ["וידאו (MP4)", "סאונד בלבד (MP3)"])
 
-# הרחבה לבחירת איכות הורדה
+# בחירת איכות
 if format_type == "וידאו (MP4)":
-    quality = st.selectbox("📺 בחר איכות וידאו:", [
-        "הכי גבוהה שיש (Best Quality)",
-        "1080p (Full HD - אם זמין)",
-        "720p (HD)",
-        "480p / 360p (חיסכון בנתונים)"
-    ])
+    quality = st.selectbox("📺 בחר איכות וידאו:", ["High Quality", "Medium Quality"])
 else:
-    quality = st.selectbox("🎧 בחר איכות סאונד:", [
-        "הכי גבוהה שיש (320kbps/Best)",
-        "סטנדרטית (192kbps)",
-        "נמוכה (128kbps - קובץ קטן)"
-    ])
+    quality = st.selectbox("🎧 בחר איכות סאונד:", ["Best Audio (MP3)"])
 
 # שדות לבחירת זמן (חיתוך)
 col1, col2 = st.columns(2)
@@ -44,59 +35,49 @@ speed_val = float(speed.split("(")[1].replace("x)", ""))
 
 if url:
     if st.button("🚀 מעבד את הסרטון - לחץ כאן"):
-        with st.spinner("מוריד ומעבד את הסרטון בענן..."):
+        with st.spinner("מושך את הסרטון דרך צינור עוקף חסימות ומעבד..."):
             temp_dir = "temp_process"
             final_output = None
             try:
                 os.makedirs(temp_dir, exist_ok=True)
-                temp_raw = os.path.join(temp_dir, "raw.%(ext)s")
+                ext = "mp4" if format_type == "וידאו (MP4)" else "mp3"
+                downloaded_file = os.path.join(temp_dir, f"raw_input.{ext}")
                 
-                # הגדרות עקיפת חסימות מתקדמות + שימוש בקליינטים חלופיים של יוטיוב
-                ydl_opts = {
-                    'outtmpl': temp_raw, 
-                    'overwrites': True,
-                    'quiet': True,
-                    'no_warnings': True,
-                    'nocheckcertificate': True,
-                    'extractor_args': {
-                        'youtube': {
-                            'player_client': ['android', 'web'],
-                            'skip': ['dash', 'hls']
-                        }
-                    },
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                    }
+                # שימוש ב-API ציבורי מהיר ועוקף חסימות רשת של יוטיוב
+                api_url = f"https://api.cobalt.tools/api/json"
+                headers = {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "url": url,
+                    "filenamePattern": "basic",
+                    "downloadMode": "audio" if ext == "mp3" else "regular",
+                    "videoQuality": "1080" if "High" in quality else "720"
                 }
                 
-                # התאמת פורמט ואיכות לפי בחירת המשתמש
-                if format_type == "סאונד בלבד (MP3)":
-                    ext = "mp3"
-                    if "320kbps" in quality or "Best" in quality:
-                        ydl_opts.update({'format': 'bestaudio/best'})
-                    elif "192kbps" in quality:
-                        ydl_opts.update({'format': 'bestaudio[abr<=192]/best'})
-                    else:
-                        ydl_opts.update({'format': 'bestaudio[abr<=128]/best'})
-                else:
-                    ext = "mp4"
-                    if "1080p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best'})
-                    elif "720p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best'})
-                    elif "480p" in quality:
-                        ydl_opts.update({'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best'})
-                    else:
-                        ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'})
+                response = requests.post(api_url, json=payload, headers=headers)
+                res_data = response.json()
                 
-                # ביצוע ההורדה
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    actual_ext = info.get('ext', ext)
-                    downloaded_file = os.path.join(temp_dir, f"raw.{actual_ext}")
+                if res_data.get("status") == "stream" or res_data.get("status") == "picker":
+                    file_download_url = res_data.get("url")
+                elif res_data.get("status") == "error":
+                    raise Exception(res_data.get("text", "שגיאת שרת חיצוני"))
+                else:
+                    file_download_url = res_data.get("url")
+                
+                if not file_download_url:
+                    raise Exception("לא ניתן היה לחלץ קישור הורדה תקין")
+                
+                # הורדת הקובץ הזמני מה-API אל שרת ה-Streamlit שלנו
+                file_res = requests.get(file_download_url, stream=True)
+                with open(downloaded_file, 'wb') as f:
+                    for chunk in file_res.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
                 
                 # נתיב לקובץ סופי
-                final_output = f"downloaded_media.{ext}"
+                final_output = f"final_media.{ext}"
                 
                 # פקודת FFmpeg לחיתוך ושינוי מהירות
                 ffmpeg_cmd = ['ffmpeg', '-y']
@@ -110,38 +91,32 @@ if url:
                 
                 # שינוי מהירות
                 if speed_val != 1.0:
-                    if format_type == "סאונד בלבד (MP3)":
+                    if ext == "mp3":
                         ffmpeg_cmd.extend(['-filter:a', f"atempo={speed_val}"])
                     else:
                         ffmpeg_cmd.extend(['-filter:v', f"setpts={1.0/speed_val}*PTS", '-filter:a', f"atempo={speed_val}"])
                 
                 # קידוד וידאו תקני למובייל
-                if format_type == "וידאו (MP4)":
+                if ext == "mp4":
                     ffmpeg_cmd.extend(['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac'])
                 
                 ffmpeg_cmd.append(final_output)
                 subprocess.run(ffmpeg_cmd, check=True)
                 
-                # הצגת כפתור הורדה
+                # הצגת כפתור הורדה למכשיר
                 with open(final_output, "rb") as f:
-                    st.success("✨ הסרטון עובד בהצלחה!")
-                    
-                    # ניקוי שם הקובץ
-                    safe_title = "".join([c for c in info.get('title', 'media') if c.isalpha() or c.isdigit() or c==' ']).rstrip()
-                    safe_title = safe_title[:20] if safe_title else "media"
-                    
+                    st.success("✨ העיבוד הסתיים בהצלחה!")
                     st.download_button(
                         label="📥 לחץ כאן להורדת הקובץ למכשיר",
                         data=f,
-                        file_name=f"{safe_title}.{ext}",
-                        mime=f"video/{ext}" if ext == "mp4" else "audio/mpeg"
+                        file_name=f"Downloader_{final_output}",
+                        mime=f"video/mp4" if ext == "mp4" else "audio/mpeg"
                     )
                 
             except Exception as e:
                 st.error(f"❌ אירעה שגיאה בעיבוד: {str(e)[:150]}")
             
             finally:
-                # ניקוי בטוח של קבצים שלא ישאירו עקבות בשרת
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
                 if final_output and os.path.exists(final_output):

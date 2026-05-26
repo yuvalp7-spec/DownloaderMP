@@ -58,7 +58,7 @@ if url:
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
-                    'impersonate': 'safari-15.5', # התחזות ישירה לדפדפן אפל רשמי
+                    'impersonate': 'chrome', # התחזות ישירה לדפדפן אפל רשמי
                     'extractor_args': {
                         'youtube': {
                             'player_client': ['ios'], # אילוץ שימוש בפרוטוקול iOS המאובטח
